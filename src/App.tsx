@@ -70,6 +70,9 @@ function App() {
   }, [stopAnimation]);
 
   const petals = useMemo(() => Array.from({ length: 5 }, (_, i) => i), []);
+  const openProgress = Math.max(0, (progress - 0.28) / 0.72);
+  const easedOpen = openProgress * openProgress * (3 - 2 * openProgress);
+  const budTightness = 1 - easedOpen;
   const status = bloomed
     ? "\u685c\u304c\u6e80\u958b\u3067\u3059\u3002\u300c\u3084\u308a\u76f4\u3057\u300d\u3067\u6700\u521d\u304b\u3089\u3084\u308a\u76f4\u305b\u307e\u3059\u3002"
     : isPressing
@@ -89,9 +92,13 @@ function App() {
         <div className="sakura" aria-hidden="true">
           {petals.map((index) => {
             const angle = index * 72;
-            const spread = 58 * progress;
-            const scale = 0.24 + 0.76 * progress;
-            const lift = 12 - progress * 10;
+            const spread = 10 + 54 * easedOpen;
+            const scaleX = 0.34 + 0.66 * easedOpen;
+            const scaleY = 0.88 + 0.12 * easedOpen;
+            const lift = 14 - easedOpen * 10;
+            const curl = (index - 2) * 6 * budTightness;
+            const tilt = (index % 2 === 0 ? -1 : 1) * 10 * budTightness;
+            const petalOpacity = 0.78 + 0.22 * easedOpen;
 
             return (
               <div
@@ -104,13 +111,15 @@ function App() {
                 <div
                   className="petal"
                   style={{
-                    transform: `translateY(${lift}px) scale(${scale})`,
+                    transform: `translateY(${lift}px) rotate(${curl + tilt}deg) scale(${scaleX}, ${scaleY})`,
+                    opacity: petalOpacity,
                   }}
                 />
               </div>
             );
           })}
-          <div className="center" style={{ transform: `scale(${0.72 + progress * 0.28})` }} />
+          <div className="center" style={{ transform: `scale(${0.68 + easedOpen * 0.32})`, opacity: 0.2 + easedOpen * 0.8 }} />
+          <div className="bud-tip" style={{ opacity: budTightness }} />
           <div className="stem" />
         </div>
       </div>
