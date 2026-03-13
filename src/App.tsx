@@ -1,83 +1,147 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const HOLD_MS = 1400;
+const FLOWER_COUNT = 5;
+const CYCLE_MS = 5200;
+const BLOOM_PHASE_END = 0.64;
+const FALL_CONTINUE_MS = 1600;
+const FLOWER_LAYOUT = [
+  { x: 18, y: 32, baseScale: 0.92 },
+  { x: 41, y: 18, baseScale: 1.03 },
+  { x: 67, y: 40, baseScale: 0.87 },
+  { x: 82, y: 24, baseScale: 0.98 },
+  { x: 50, y: 56, baseScale: 0.94 },
+];
+
+type Mode = "idle" | "pressing" | "falling";
+type FallSeed = { active: boolean; startFall: number };
+
+const smoothstep = (value: number) => value * value * (3 - 2 * value);
+
+const getPressState = (elapsed: number) => {
+  const phase = ((elapsed / CYCLE_MS) % 1 + 1) % 1;
+  const bloomRaw = Math.min(1, phase / BLOOM_PHASE_END);
+  const bloomProgress = smoothstep(bloomRaw);
+
+  const fallRaw =
+    phase <= BLOOM_PHASE_END ? 0 : Math.min(1, (phase - BLOOM_PHASE_END) / (1 - BLOOM_PHASE_END));
+  const fallProgress = fallRaw * fallRaw;
+
+  return { bloomProgress, fallProgress };
+};
 
 function App() {
-  const [progress, setProgress] = useState(0);
-  const [isPressing, setIsPressing] = useState(false);
-  const [bloomed, setBloomed] = useState(false);
+  const [mode, setMode] = useState<Mode>("idle");
+  const [pressElapsed, setPressElapsed] = useState(0);
+  const [fallElapsed, setFallElapsed] = useState(0);
 
-  const rafRef = useRef<number | null>(null);
-  const pressStartedAtRef = useRef<number>(0);
-  const baseProgressRef = useRef<number>(0);
+  const pressRafRef = useRef<number | null>(null);
+  const fallRafRef = useRef<number | null>(null);
+  const pressStartedAtRef = useRef(0);
+  const fallStartedAtRef = useRef(0);
+  const hasBloomedDuringPressRef = useRef(false);
+  const fallSeedsRef = useRef<FallSeed[]>(
+    Array.from({ length: FLOWER_COUNT }, () => ({ active: false, startFall: 0 }))
+  );
 
-  const stopAnimation = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+  const stopPressAnimation = useCallback(() => {
+    if (pressRafRef.current !== null) {
+      cancelAnimationFrame(pressRafRef.current);
+      pressRafRef.current = null;
     }
   }, []);
 
-  const animate = useCallback(
-    (now: number) => {
-      const elapsed = now - pressStartedAtRef.current;
-      const next = Math.min(1, baseProgressRef.current + elapsed / HOLD_MS);
-      setProgress(next);
+  const stopFallAnimation = useCallback(() => {
+    if (fallRafRef.current !== null) {
+      cancelAnimationFrame(fallRafRef.current);
+      fallRafRef.current = null;
+    }
+  }, []);
 
-      if (next >= 1) {
-        setBloomed(true);
-        setIsPressing(false);
-        stopAnimation();
+  const animatePress = useCallback((now: number) => {
+    const elapsed = now - pressStartedAtRef.current;
+    const pressState = getPressState(elapsed);
+    if (pressState.bloomProgress >= 0.995) {
+      hasBloomedDuringPressRef.current = true;
+    }
+    setPressElapsed(elapsed);
+    pressRafRef.current = requestAnimationFrame(animatePress);
+  }, []);
+
+  const animateFall = useCallback(
+    (now: number) => {
+      const elapsed = now - fallStartedAtRef.current;
+      setFallElapsed(elapsed);
+
+      if (elapsed >= FALL_CONTINUE_MS) {
+        stopFallAnimation();
+        setMode("idle");
+        setFallElapsed(0);
         return;
       }
 
-      rafRef.current = requestAnimationFrame(animate);
+      fallRafRef.current = requestAnimationFrame(animateFall);
     },
-    [stopAnimation]
+    [stopFallAnimation]
   );
 
   const startPress = useCallback(() => {
-    if (bloomed) {
+    stopPressAnimation();
+    stopFallAnimation();
+
+    setMode("pressing");
+    setPressElapsed(0);
+    setFallElapsed(0);
+    hasBloomedDuringPressRef.current = false;
+
+    pressStartedAtRef.current = performance.now();
+    pressRafRef.current = requestAnimationFrame(animatePress);
+  }, [animatePress, stopFallAnimation, stopPressAnimation]);
+
+  const endPress = useCallback(() => {
+    if (mode !== "pressing") {
       return;
     }
 
-    setIsPressing(true);
-    pressStartedAtRef.current = performance.now();
-    baseProgressRef.current = progress;
-    stopAnimation();
-    rafRef.current = requestAnimationFrame(animate);
-  }, [animate, bloomed, progress, stopAnimation]);
+    stopPressAnimation();
 
-  const endPress = useCallback(() => {
-    setIsPressing(false);
-    stopAnimation();
-    if (!bloomed) {
-      setProgress(0);
-      baseProgressRef.current = 0;
+    const seeds = Array.from({ length: FLOWER_COUNT }, () => {
+      const { bloomProgress, fallProgress } = getPressState(pressElapsed);
+      const active = hasBloomedDuringPressRef.current || bloomProgress >= 0.995 || fallProgress > 0;
+      return { active, startFall: fallProgress };
+    });
+
+    const hasFallingFlower = seeds.some((seed) => seed.active);
+
+    if (!hasFallingFlower) {
+      setMode("idle");
+      setPressElapsed(0);
+      return;
     }
-  }, [bloomed, stopAnimation]);
 
-  const resetBloom = useCallback(() => {
-    stopAnimation();
-    setIsPressing(false);
-    setBloomed(false);
-    setProgress(0);
-    baseProgressRef.current = 0;
-  }, [stopAnimation]);
+    fallSeedsRef.current = seeds;
+    setMode("falling");
+    setPressElapsed(0);
+    setFallElapsed(0);
+    fallStartedAtRef.current = performance.now();
+    fallRafRef.current = requestAnimationFrame(animateFall);
+  }, [animateFall, mode, pressElapsed, stopPressAnimation]);
 
   useEffect(() => {
-    return () => stopAnimation();
-  }, [stopAnimation]);
+    return () => {
+      stopPressAnimation();
+      stopFallAnimation();
+    };
+  }, [stopFallAnimation, stopPressAnimation]);
 
   const petals = useMemo(() => Array.from({ length: 5 }, (_, i) => i), []);
-  const openProgress = Math.max(0, (progress - 0.28) / 0.72);
-  const easedOpen = openProgress * openProgress * (3 - 2 * openProgress);
-  const budTightness = 1 - easedOpen;
-  const status = bloomed
-    ? "\u685c\u304c\u6e80\u958b\u3067\u3059\u3002\u300c\u3084\u308a\u76f4\u3057\u300d\u3067\u6700\u521d\u304b\u3089\u3084\u308a\u76f4\u305b\u307e\u3059\u3002"
-    : isPressing
-      ? "\u305d\u306e\u307e\u307e\u9577\u62bc\u3057\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
-      : "\u753b\u9762\u3092\u9577\u62bc\u3057\u3057\u3066\u685c\u3092\u958b\u82b1\u3055\u305b\u3066\u304f\u3060\u3055\u3044\u3002";
+  const flowers = useMemo(() => Array.from({ length: FLOWER_COUNT }, (_, i) => i), []);
+
+  const status =
+    mode === "pressing"
+      ? "\u9577\u62bc\u3057\u4e2d\uff1a\u958b\u82b1\u3068\u843d\u4e0b\u3092\u30eb\u30fc\u30d7\u4e2d\u3067\u3059\u3002"
+      : mode === "falling"
+        ? "\u958b\u82b1\u3057\u305f\u82b1\u3060\u3051\u3001\u6307\u3092\u96e2\u3057\u3066\u3082\u843d\u4e0b\u3057\u307e\u3059\u3002"
+        : "\u753b\u9762\u3092\u9577\u62bc\u3057\u3059\u308b\u3068\u958b\u82b1\u3057\u307e\u3059\u3002";
 
   return (
     <main
@@ -89,57 +153,104 @@ function App() {
       onContextMenu={(event) => event.preventDefault()}
     >
       <div className="scene">
-        <div className="sakura" aria-hidden="true">
-          {petals.map((index) => {
-            const angle = index * 72;
-            const spread = 10 + 54 * easedOpen;
-            const scaleX = 0.34 + 0.66 * easedOpen;
-            const scaleY = 0.88 + 0.12 * easedOpen;
-            const lift = 14 - easedOpen * 10;
-            const curl = (index - 2) * 6 * budTightness;
-            const tilt = (index % 2 === 0 ? -1 : 1) * 10 * budTightness;
-            const petalOpacity = 0.78 + 0.22 * easedOpen;
+        <div className="garden">
+          {flowers.map((flowerIndex) => {
+            const layout = FLOWER_LAYOUT[flowerIndex];
+            let bloomProgress = 0;
+            let fallProgress = 0;
+
+            if (mode === "pressing") {
+              const pressState = getPressState(pressElapsed);
+              bloomProgress = pressState.bloomProgress;
+              fallProgress = pressState.fallProgress;
+            }
+
+            if (mode === "falling") {
+              const seed = fallSeedsRef.current[flowerIndex];
+              if (seed?.active) {
+                bloomProgress = 1;
+                const t = Math.min(1, fallElapsed / FALL_CONTINUE_MS);
+                fallProgress = seed.startFall + (1 - seed.startFall) * t;
+              }
+            }
+
+            const budTightness = 1 - bloomProgress;
+            const dropYVh = fallProgress * (130 + flowerIndex * 6);
+
+            let swayX = 0;
+            if (mode === "pressing") {
+              swayX = Math.sin(pressElapsed / 500 + flowerIndex) * (6 + bloomProgress * 6);
+            }
+            if (mode === "falling") {
+              swayX = Math.sin(fallElapsed / 260 + flowerIndex) * 12;
+            }
+
+            const blossomScale = layout.baseScale * (0.72 + bloomProgress * 0.3);
+            const blossomOpacity = 1 - fallProgress * 0.28;
 
             return (
               <div
-                key={index}
-                className="petal-wrap"
+                key={flowerIndex}
+                className="sakura-item"
                 style={{
-                  transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(${-spread}px)`,
+                  left: `${layout.x}%`,
+                  top: `${layout.y}%`,
+                  transform: `translate(-50%, ${dropYVh}vh)`,
                 }}
               >
                 <div
-                  className="petal"
+                  className="sakura"
                   style={{
-                    transform: `translateY(${lift}px) rotate(${curl + tilt}deg) scale(${scaleX}, ${scaleY})`,
-                    opacity: petalOpacity,
+                    transform: `translateX(${swayX}px) scale(${blossomScale})`,
+                    opacity: blossomOpacity,
                   }}
-                />
+                  aria-hidden="true"
+                >
+                  {petals.map((petalIndex) => {
+                    const angle = petalIndex * 72;
+                    const spread = 10 + 54 * bloomProgress;
+                    const scaleX = 0.34 + 0.66 * bloomProgress;
+                    const scaleY = 0.88 + 0.12 * bloomProgress;
+                    const lift = 14 - bloomProgress * 10;
+                    const curl = (petalIndex - 2) * 6 * budTightness;
+                    const tilt = (petalIndex % 2 === 0 ? -1 : 1) * 10 * budTightness;
+                    const petalOpacity = 0.78 + 0.22 * bloomProgress;
+
+                    return (
+                      <div
+                        key={petalIndex}
+                        className="petal-wrap"
+                        style={{
+                          transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(${-spread}px)`,
+                        }}
+                      >
+                        <div
+                          className="petal"
+                          style={{
+                            transform: `translateY(${lift}px) rotate(${curl + tilt}deg) scale(${scaleX}, ${scaleY})`,
+                            opacity: petalOpacity,
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                  <div
+                    className="center"
+                    style={{
+                      transform: `scale(${0.68 + bloomProgress * 0.32})`,
+                      opacity: 0.2 + bloomProgress * 0.8,
+                    }}
+                  />
+                  <div className="bud-tip" style={{ opacity: budTightness }} />
+                  <div className="stem" />
+                </div>
               </div>
             );
           })}
-          <div className="center" style={{ transform: `scale(${0.68 + easedOpen * 0.32})`, opacity: 0.2 + easedOpen * 0.8 }} />
-          <div className="bud-tip" style={{ opacity: budTightness }} />
-          <div className="stem" />
         </div>
       </div>
       <section className="hud">
         <p>{status}</p>
-        <div className="meter" role="img" aria-label={`Bloom progress ${Math.round(progress * 100)}%`}>
-          <div className="meter-fill" style={{ width: `${progress * 100}%` }} />
-        </div>
-        <button
-          className="reset-button"
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            resetBloom();
-          }}
-        >
-          \u3084\u308a\u76f4\u3057
-        </button>
       </section>
     </main>
   );
