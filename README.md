@@ -1,21 +1,54 @@
 # sakura
 
-## Tailscale経由でスマホ表示する手順
+花が咲いて散る動きを楽しめる、React + Vite 製のシンプルなアニメーションアプリです。
 
-1. PCとスマホの両方でTailscaleにログインし、同じTailnetに参加します。
+## できること
+
+- `fall` モード: 長押しして花を咲かせ、離すと花びらが散ります。
+- `fill` モード: 長押しして画面内に花を増やしていきます。
+
+## ローカルで起動する
+
+前提:
+
+- Node.js と npm が使えること
+
+手順:
+
+1. 依存関係をインストールします。
+
+```bash
+npm install
+```
+
+2. 開発サーバーを起動します。
+
+```bash
+npm run dev
+```
+
+3. ブラウザで表示します。
+
+```text
+http://localhost:5173
+```
+
+## Tailscale 経由で他の端末から開く
+
+1. PC とスマートフォンの両方で Tailscale にログインし、同じ tailnet に参加します。
 2. このプロジェクトで開発サーバーを起動します。
 
 ```bash
 npm run dev
 ```
 
-3. PC側のTailscale IPv4アドレスを確認します。
+3. PC の Tailscale IPv4 アドレスを確認します。
 
 ```bash
 tailscale ip -4
 ```
 
-4. スマホのブラウザで次のURLを開きます。
+4. スマートフォンのブラウザで次の URL を開きます。
 
 ```text
 http://<PCのTailscale IP>:5173
@@ -27,14 +60,23 @@ http://<PCのTailscale IP>:5173
 http://100.101.102.103:5173
 ```
 
-うまく開けない場合は、Windows Defender FirewallでNode.jsの受信を許可してください。
-## GitHub Pages
+接続できない場合は、Windows Defender Firewall で Node.js の通信が許可されているか確認してください。
 
-This repository is configured to deploy to GitHub Pages with GitHub Actions.
+## GitHub Pages で公開する
 
-1. Push this project to a GitHub repository named `sakura`.
-2. In GitHub, open `Settings` -> `Pages`.
-3. Set `Source` to `GitHub Actions`.
-4. Push to `main` or `master`.
+このリポジトリは GitHub Actions を使って GitHub Pages にデプロイできるよう設定済みです。
 
-The workflow will build the Vite app and publish the contents of `dist/`.
+1. このプロジェクトを GitHub に push します。
+2. GitHub の `Settings` -> `Pages` を開きます。
+3. `Source` を `GitHub Actions` に設定します。
+4. `main` または `master` ブランチに push します。
+
+デプロイが成功すると、GitHub Pages に `dist/` の内容が公開されます。
+
+## ビルド
+
+本番用ビルドは次のコマンドで作成できます。
+
+```bash
+npm run build
+```
