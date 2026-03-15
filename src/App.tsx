@@ -31,9 +31,13 @@ type FlowerLayout = {
 };
 
 const smoothstep = (value: number) => value * value * (3 - 2 * value);
-const randomInRange = (min: number, max: number) => min + Math.random() * (max - min);
+const randomInRange = (min: number, max: number) =>
+  min + Math.random() * (max - min);
 
-const createFlowerLayouts = (count: number, pattern: PatternMode): FlowerLayout[] => {
+const createFlowerLayouts = (
+  count: number,
+  pattern: PatternMode,
+): FlowerLayout[] => {
   const layouts: FlowerLayout[] = [];
   const minDistance = pattern === "fill" ? 12 : 18;
   const baseScale = pattern === "fill" ? 0.74 : 0.96;
@@ -129,7 +133,7 @@ function App() {
   const [fallElapsed, setFallElapsed] = useState(0);
   const [fillLevel, setFillLevel] = useState(0);
   const [flowerLayouts, setFlowerLayouts] = useState<FlowerLayout[]>(() =>
-    createFlowerLayouts(FALL_FLOWER_COUNT, "fall")
+    createFlowerLayouts(FALL_FLOWER_COUNT, "fall"),
   );
 
   const pressRafRef = useRef<number | null>(null);
@@ -140,9 +144,13 @@ function App() {
   const cycleIndexRef = useRef(-1);
   const hasBloomedDuringPressRef = useRef(false);
   const fallSeedsRef = useRef<FallSeed[]>(
-    Array.from({ length: MAX_FLOWER_COUNT }, () => ({ active: false, startFall: 0 }))
+    Array.from({ length: MAX_FLOWER_COUNT }, () => ({
+      active: false,
+      startFall: 0,
+    })),
   );
-  const activeFlowerCount = pattern === "fill" ? FILL_FLOWER_COUNT : FALL_FLOWER_COUNT;
+  const activeFlowerCount =
+    pattern === "fill" ? FILL_FLOWER_COUNT : FALL_FLOWER_COUNT;
 
   const stopPressAnimation = useCallback(() => {
     if (pressRafRef.current !== null) {
@@ -158,28 +166,34 @@ function App() {
     }
   }, []);
 
-  const animatePress = useCallback((now: number) => {
-    const elapsed = now - pressStartedAtRef.current;
-    if (pattern === "fill") {
-      const nextLevel = Math.min(1, fillBaseLevelRef.current + elapsed / FILL_BUILD_MS);
-      setPressElapsed(elapsed);
-      setFillLevel(nextLevel);
-      pressRafRef.current = requestAnimationFrame(animatePress);
-      return;
-    }
+  const animatePress = useCallback(
+    (now: number) => {
+      const elapsed = now - pressStartedAtRef.current;
+      if (pattern === "fill") {
+        const nextLevel = Math.min(
+          1,
+          fillBaseLevelRef.current + elapsed / FILL_BUILD_MS,
+        );
+        setPressElapsed(elapsed);
+        setFillLevel(nextLevel);
+        pressRafRef.current = requestAnimationFrame(animatePress);
+        return;
+      }
 
-    const cycleIndex = pattern === "fill" ? 0 : Math.floor(elapsed / CYCLE_MS);
-    if (cycleIndex !== cycleIndexRef.current) {
-      cycleIndexRef.current = cycleIndex;
-      setFlowerLayouts(createFlowerLayouts(activeFlowerCount, pattern));
-    }
-    const pressState = getPressState(elapsed, pattern);
-    if (pressState.bloomProgress >= 0.995) {
-      hasBloomedDuringPressRef.current = true;
-    }
-    setPressElapsed(elapsed);
-    pressRafRef.current = requestAnimationFrame(animatePress);
-  }, [activeFlowerCount, pattern]);
+      const cycleIndex = Math.floor(elapsed / CYCLE_MS);
+      if (cycleIndex !== cycleIndexRef.current) {
+        cycleIndexRef.current = cycleIndex;
+        setFlowerLayouts(createFlowerLayouts(activeFlowerCount, pattern));
+      }
+      const pressState = getPressState(elapsed, pattern);
+      if (pressState.bloomProgress >= 0.995) {
+        hasBloomedDuringPressRef.current = true;
+      }
+      setPressElapsed(elapsed);
+      pressRafRef.current = requestAnimationFrame(animatePress);
+    },
+    [activeFlowerCount, pattern],
+  );
 
   const animateFall = useCallback(
     (now: number) => {
@@ -196,7 +210,7 @@ function App() {
 
       fallRafRef.current = requestAnimationFrame(animateFall);
     },
-    [stopFallAnimation]
+    [stopFallAnimation],
   );
 
   const startPress = useCallback(() => {
@@ -215,7 +229,14 @@ function App() {
 
     pressStartedAtRef.current = performance.now();
     pressRafRef.current = requestAnimationFrame(animatePress);
-  }, [activeFlowerCount, animatePress, fillLevel, pattern, stopFallAnimation, stopPressAnimation]);
+  }, [
+    activeFlowerCount,
+    animatePress,
+    fillLevel,
+    pattern,
+    stopFallAnimation,
+    stopPressAnimation,
+  ]);
 
   const endPress = useCallback(() => {
     if (mode !== "pressing") {
@@ -233,8 +254,14 @@ function App() {
     }
 
     const seeds = Array.from({ length: activeFlowerCount }, () => {
-      const { bloomProgress, fallProgress } = getPressState(pressElapsed, pattern);
-      const active = hasBloomedDuringPressRef.current || bloomProgress >= 0.995 || fallProgress > 0;
+      const { bloomProgress, fallProgress } = getPressState(
+        pressElapsed,
+        pattern,
+      );
+      const active =
+        hasBloomedDuringPressRef.current ||
+        bloomProgress >= 0.995 ||
+        fallProgress > 0;
       return { active, startFall: fallProgress };
     });
 
@@ -253,7 +280,14 @@ function App() {
     setFallElapsed(0);
     fallStartedAtRef.current = performance.now();
     fallRafRef.current = requestAnimationFrame(animateFall);
-  }, [activeFlowerCount, animateFall, mode, pattern, pressElapsed, stopPressAnimation]);
+  }, [
+    activeFlowerCount,
+    animateFall,
+    mode,
+    pattern,
+    pressElapsed,
+    stopPressAnimation,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -338,23 +372,40 @@ function App() {
               return null;
             }
 
-            const openProgress = smoothstep(Math.max(0, (bloomProgress - 0.12) / 0.88));
+            const openProgress = smoothstep(
+              Math.max(0, (bloomProgress - 0.12) / 0.88),
+            );
             const budTightness = 1 - openProgress;
 
             let swayX = 0;
             if (mode === "pressing") {
-              swayX = Math.sin(pressElapsed / 500 + flowerIndex) * layout.sway * (6 + bloomProgress * 6);
+              swayX =
+                Math.sin(pressElapsed / 500 + flowerIndex) *
+                layout.sway *
+                (6 + bloomProgress * 6);
             }
             if (mode === "falling") {
-              swayX = Math.sin(fallElapsed / 260 + flowerIndex) * layout.sway * 12;
+              swayX =
+                Math.sin(fallElapsed / 260 + flowerIndex) * layout.sway * 12;
             }
 
-            const blossomScale = layout.baseScale * (0.56 + openProgress * 0.44);
+            const blossomScale =
+              layout.baseScale * (0.56 + openProgress * 0.44);
             const blossomOpacity = 1 - fallProgress * 0.12;
-            const centerOpacity = Math.max(0, Math.max(0, (openProgress - 0.58) / 0.42) * (1 - fallProgress * 1.8));
+            const centerOpacity = Math.max(
+              0,
+              Math.max(0, (openProgress - 0.58) / 0.42) *
+                (1 - fallProgress * 1.8),
+            );
             const stemOpacity = Math.max(0, 1 - fallProgress * 2.6);
-            const budOpacity = Math.max(0, budTightness * (1 - fallProgress * 2.2));
-            const shellOpacity = Math.max(0, (0.94 - openProgress * 1.15) * (1 - fallProgress * 2.2));
+            const budOpacity = Math.max(
+              0,
+              budTightness * (1 - fallProgress * 2.2),
+            );
+            const shellOpacity = Math.max(
+              0,
+              (0.94 - openProgress * 1.15) * (1 - fallProgress * 2.2),
+            );
 
             return (
               <div
@@ -383,19 +434,28 @@ function App() {
                     const scaleY = 1.1 - 0.14 * openProgress;
                     const lift = 10 - openProgress * 6;
                     const petalOpacity = 0.18 + 0.82 * openProgress;
-                    const detachedFall = Math.max(0, (fallProgress - motion.delay) / (1 - motion.delay));
+                    const detachedFall = Math.max(
+                      0,
+                      (fallProgress - motion.delay) / (1 - motion.delay),
+                    );
                     const fallMotion = smoothstep(detachedFall);
                     const waveA = Math.sin(
-                      fallMotion * Math.PI * 2 * motion.flutter + motion.wavePhase + flowerIndex
+                      fallMotion * Math.PI * 2 * motion.flutter +
+                        motion.wavePhase +
+                        flowerIndex,
                     );
                     const waveB = Math.cos(
-                      fallMotion * Math.PI * (motion.flutter + 0.8) + motion.wavePhase * 0.7
+                      fallMotion * Math.PI * (motion.flutter + 0.8) +
+                        motion.wavePhase * 0.7,
                     );
                     const flutterX =
                       motion.driftX * 0.55 * fallMotion +
                       waveA * motion.arc * (0.7 + fallMotion * 0.75) +
                       waveB * (motion.arc * 0.4) +
-                      Math.sin(fallMotion * Math.PI * 5 + motion.wavePhase * 1.3) * (motion.arc * 0.22);
+                      Math.sin(
+                        fallMotion * Math.PI * 5 + motion.wavePhase * 1.3,
+                      ) *
+                        (motion.arc * 0.22);
                     const flutterY =
                       motion.dropY * Math.pow(fallMotion, 1.28) -
                       Math.sin(fallMotion * Math.PI * 3 + motion.wavePhase) *
@@ -405,7 +465,8 @@ function App() {
                         0.6;
                     const orbitX = Math.cos(angleRad) * spread;
                     const orbitY = Math.sin(angleRad) * spread;
-                    const petalSpin = motion.spin * fallMotion * 0.35 + waveB * 10 * fallMotion;
+                    const petalSpin =
+                      motion.spin * fallMotion * 0.35 + waveB * 10 * fallMotion;
                     const fallScale = 1 + 0.06 * fallMotion;
 
                     return (
@@ -420,7 +481,10 @@ function App() {
                           className="petal"
                           style={{
                             transform: `translateY(${lift}px) rotate(${angle + 90 + petalSpin}deg) scale(${scaleX * fallScale}, ${scaleY * fallScale})`,
-                            opacity: Math.max(0, petalOpacity * (1 - fallMotion * 0.14)),
+                            opacity: Math.max(
+                              0,
+                              petalOpacity * (1 - fallMotion * 0.14),
+                            ),
                           }}
                         />
                       </div>
@@ -451,7 +515,9 @@ function App() {
       <section className="hud">
         <div className="mode-switch" role="group" aria-label="display pattern">
           <button
-            className={pattern === "fall" ? "mode-button is-active" : "mode-button"}
+            className={
+              pattern === "fall" ? "mode-button is-active" : "mode-button"
+            }
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -459,10 +525,12 @@ function App() {
               setPattern("fall");
             }}
           >
-            \u821e\u3044\u843d\u3061
+            落下
           </button>
           <button
-            className={pattern === "fill" ? "mode-button is-active" : "mode-button"}
+            className={
+              pattern === "fill" ? "mode-button is-active" : "mode-button"
+            }
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -470,7 +538,7 @@ function App() {
               setPattern("fill");
             }}
           >
-            \u753b\u9762\u3044\u3063\u3071\u3044
+            画面いっぱい
           </button>
         </div>
         <p>{status}</p>
