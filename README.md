@@ -28,3 +28,13 @@ http://100.101.102.103:5173
 ```
 
 うまく開けない場合は、Windows Defender FirewallでNode.jsの受信を許可してください。
+## GitHub Pages
+
+This repository is configured to deploy to GitHub Pages with GitHub Actions.
+
+1. Push this project to a GitHub repository named `sakura`.
+2. In GitHub, open `Settings` -> `Pages`.
+3. Set `Source` to `GitHub Actions`.
+4. Push to `main` or `master`.
+
+The workflow will build the Vite app and publish the contents of `dist/`.
